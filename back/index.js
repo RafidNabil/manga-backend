@@ -22,7 +22,11 @@ const headers = {
     "Upgrade-Insecure-Requests": "1",
 };
 
-app.use(cors());
+app.use(cors({
+  origin: '*',  // for testing only — allow all origins
+  // origin: 'http://localhost:3000' // for dev React app
+  credentials: true,
+}));
 app.use(express.json());
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
