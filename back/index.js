@@ -23,9 +23,9 @@ const headers = {
 };
 
 app.use(cors({
-  origin: '*',  // for testing only — allow all origins
+  origin: '*',
   // origin: 'http://localhost:3000' // for dev React app
-  credentials: true,
+  // credentials: false,
 }));
 app.use(express.json());
 
