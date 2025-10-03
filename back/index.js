@@ -4,8 +4,6 @@ import dotenv from 'dotenv'
 import axios from 'axios'
 import { createClient } from '@supabase/supabase-js'
 
-import pool from './db.js'
-
 dotenv.config()
 
 const app = express()
@@ -20,11 +18,14 @@ app.use(cors({
 }))
 app.use(express.json())
 
+// --- CONFIGURATION ---
 const SUPABASE_URL = process.env.SUPABASE_URL
 const SUPABASE_KEY = process.env.SUPABASE_KEY
 const PORT = process.env.PORT || 5000
 
+// Initialize Supabase Client
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
+// ---------------------
 
 // --------------------- PROXY IMAGE ROUTE ---------------------
 app.get('/proxy-image', async (req, res) => {
@@ -42,7 +43,6 @@ app.get('/proxy-image', async (req, res) => {
             responseType: 'stream',
             headers: dynamicHeaders,
             validateStatus: () => true,
-            // timeout: 10000,
         })
 
         res.status(response.status)
@@ -57,6 +57,49 @@ app.get('/proxy-image', async (req, res) => {
         console.error('Error fetching image:', error.message)
         res.status(500).send(`Error fetching image: ${error.message}`)
     }
+})
+
+// --------------------- SUGGESTION ROUTE (UNIFIED) ---------------------
+app.get('/suggest-unified', async (req, res) => {
+    const { term } = req.query
+    if (!term || term.length < 2) {
+        return res.json([])
+    }
+
+    const validKeys = ['artist', 'tag', 'parody', 'character', 'mgroup']
+    
+    // Function to search a single table
+    async function searchTable(key) {
+        try {
+            const { data, error } = await supabase
+                .from(key)
+                .select(key)
+                // Use ILIKE for case-insensitive partial matching
+                .ilike(key, `%${term}%`)
+                .limit(5) 
+
+            if (error) throw error
+
+            // Map results to the unified format { value: "...", type: "..." }
+            return data.map(row => ({ 
+                value: row[key], 
+                type: key 
+            }))
+
+        } catch (err) {
+            console.error(`Error fetching suggestions for ${key}:`, err.message)
+            return []
+        }
+    }
+
+    // Run all searches concurrently and combine results
+    const promises = validKeys.map(searchTable)
+    const allResults = await Promise.all(promises)
+    
+    const combinedResults = allResults.flat()
+    
+    // Cap the total suggestions for the frontend
+    res.json(combinedResults.slice(0, 15)) 
 })
 
 // --------------------- HELPERS ---------------------
